@@ -1,0 +1,17 @@
+const jwt = require("jsonwebtoken");
+
+module.exports = (req, res, next) => {
+  const token = req.header("Authorization");
+
+  if (!token) {
+    return res.status(401).json({ message: "Accès refusé : pas de token" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // on ajoute les données décodées à la requête
+    next();
+  } catch (error) {
+    res.status(401).json({ message: "Token invalide" });
+  }
+};
