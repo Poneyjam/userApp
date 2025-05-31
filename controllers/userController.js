@@ -20,6 +20,7 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,  // Assure-toi que cette variable est définie dans .env
       { expiresIn: '1h' }
     );
+    console.log("JWT_SECRET =", process.env.JWT_SECRET);
 
     // Renvoie token + user (sans le password)
     res.json({
