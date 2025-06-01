@@ -2,20 +2,24 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit'); 
+const rateLimit = require('express-rate-limit');
+const path = require('path'); // ← ici, pas en double
 
 dotenv.config();
 
 const app = express();
 
-// Middlewares
+// Middlewares globaux
 app.use(cors());
 app.use(express.json());
 
-// ✅ Rate limiting pour les routes sensibles
+// ✅ Servir les fichiers du dossier /uploads (images d'avatar)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ✅ Rate limiting (anti-bruteforce pour login / register)
 const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 5, // Max 5 requêtes par IP
+  windowMs: 1 * 60 * 1000,
+  max: 5,
   message: {
     message: 'Trop de tentatives, veuillez patienter une minute.',
   },
@@ -26,14 +30,14 @@ const authLimiter = rateLimit({
 // Routes
 const userRoutes = require('./routes/userRoutes');
 
-// Appliquer le rate limiter uniquement sur login et register
+// Appliquer le limiter uniquement aux routes sensibles
 app.use('/api/users/login', authLimiter);
 app.use('/api/users/register', authLimiter);
 
-// Puis charger toutes les routes normalement
+// Toutes les autres routes utilisateur
 app.use('/api/users', userRoutes);
 
-// Connexion à MongoDB
+// Connexion MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -41,8 +45,8 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log("✅ MongoDB connecté"))
 .catch(err => console.error("❌ Erreur MongoDB :", err));
 
-// Lancer le serveur
+// Démarrage du serveur
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur en cours sur le port ${PORT}`);
+  console.log(`🚀 Serveur lancé sur le port ${PORT}`);
 });

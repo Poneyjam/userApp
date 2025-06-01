@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: 1000, // limite facultative
   },
+
+  avatarUrl: {
+    type: String,
+    default: '', // ou une URL vers une image par défaut
+  },
+
 }, {
   timestamps: true, // ajoute automatiquement createdAt et updatedAt
 });
