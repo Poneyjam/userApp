@@ -3,26 +3,29 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const path = require('path'); // ← ici, pas en double
+const path = require('path');
 
 dotenv.config();
 
 const app = express();
 
-// Middlewares globaux
+// ✅ Middleware global CORS – AJOUTE-LE ICI
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // ou restreins à ton domaine en prod
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
+
+// Autres middlewares
 app.use(cors());
 app.use(express.json());
 
-// ✅ Servir les fichiers du dossier /uploads (images d'avatar)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ✅ Rate limiting (anti-bruteforce pour login / register)
+// ✅ Rate limiter
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 5,
-  message: {
-    message: 'Trop de tentatives, veuillez patienter une minute.',
-  },
+  message: { message: 'Trop de tentatives, veuillez patienter.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -30,12 +33,13 @@ const authLimiter = rateLimit({
 // Routes
 const userRoutes = require('./routes/userRoutes');
 
-// Appliquer le limiter uniquement aux routes sensibles
 app.use('/api/users/login', authLimiter);
 app.use('/api/users/register', authLimiter);
 
-// Toutes les autres routes utilisateur
 app.use('/api/users', userRoutes);
+
+// Statique pour les avatars
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connexion MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -45,8 +49,8 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log("✅ MongoDB connecté"))
 .catch(err => console.error("❌ Erreur MongoDB :", err));
 
-// Démarrage du serveur
+// Lancer le serveur
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur lancé sur le port ${PORT}`);
+  console.log(`🚀 Serveur en cours sur le port ${PORT}`);
 });
