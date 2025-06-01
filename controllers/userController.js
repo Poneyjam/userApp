@@ -1,52 +1,67 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const { validationResult } = require('express-validator');
 
 // Fonction d'inscription
 exports.register = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: 'Entrées invalides', errors: errors.array() });
+  }
+
   const { name, email, password } = req.body;
 
   try {
     // Vérifie si l'utilisateur existe déjà
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: 'Utilisateur déjà existant' });
+    const existingUser = await User.findOne({ email }).lean(); // lean = renvoie un objet JS simple
+    if (existingUser) {
+      return res.status(400).json({ message: 'Un compte avec cet email existe déjà' });
+    }
 
-    // Hash le mot de passe
-    const salt = await bcrypt.genSalt(10);
+    // Hash du mot de passe
+    const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Crée un nouvel utilisateur
-    user = new User({ name, email, password: hashedPassword });
+    // Création de l'utilisateur
+    const user = new User({
+      name: sanitize(name),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+    });
+
     await user.save();
 
-    res.status(201).json({ message: 'Utilisateur créé avec succès' });
+    return res.status(201).json({ message: 'Utilisateur créé avec succès' });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    console.error('Erreur dans register:', error);
+    return res.status(500).json({ message: 'Erreur serveur' });
   }
 };
 
 // Fonction de connexion
 exports.login = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: 'Entrées invalides', errors: errors.array() });
+  }
+
   const { email, password } = req.body;
 
   try {
-    // Cherche l'utilisateur dans la base
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Utilisateur non trouvé' });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(400).json({ message: 'Identifiants invalides' });
+    }
 
-    // Compare le mot de passe fourni avec le hash stocké
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Mot de passe incorrect' });
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Identifiants invalides' }); // message générique pour éviter les attaques par enumeration
+    }
 
-    // Génère un token JWT
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    // Renvoie le token et les infos utilisateur (sans le mot de passe)
-    res.json({
+    return res.json({
       token,
       user: {
         id: user._id,
@@ -55,6 +70,12 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    console.error('Erreur dans login:', error);
+    return res.status(500).json({ message: 'Erreur serveur' });
   }
 };
+
+// Sanitize une chaîne pour éviter XSS (très simple version)
+function sanitize(str) {
+  return str.replace(/[<>&'"]/g, '');
+}
